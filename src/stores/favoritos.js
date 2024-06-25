@@ -1,49 +1,73 @@
-import { ref, watch, onMounted } from 'vue'
-import { defineStore } from 'pinia'
-import { useBebidasStore } from './bebidas'
+import { ref, watch, onMounted, computed } from "vue";
+import { defineStore } from "pinia";
+import { useBebidasStore } from "./bebidas";
+import { useModalStore } from "./modal";
+import { useNotificacionStore } from "./notificaciones";
 
-export const useFavoritosStore = defineStore('favoritos', () => {
+export const useFavoritosStore = defineStore("favoritos", () => {
+	const bebidas = useBebidasStore();
+	const modal = useModalStore();
+	const notificaciones = useNotificacionStore();
+	const favoritos = ref([]);
 
-    const bebidas = useBebidasStore()
-    const favoritos = ref([])
+	onMounted(() => {
+		favoritos.value = JSON.parse(localStorage.getItem("favoritos")) ?? [];
+	});
 
-    onMounted(() => {
-        favoritos.value = JSON.parse(localStorage.getItem('favoritos')) ?? []
-    })
+	watch(
+		favoritos,
+		() => {
+			sincronizarLocalStorage();
+		},
+		{ deep: true }
+	);
 
-    watch(favoritos, () => {
-        sincronizarLocalStorage()
-    }, { deep: true })
+	const sincronizarLocalStorage = () => {
+		localStorage.setItem("favoritos", JSON.stringify(favoritos.value));
+	};
 
-    const sincronizarLocalStorage = () => {
-        localStorage.setItem('favoritos', JSON.stringify(favoritos.value))
-    }
+	function existeFavorito() {
+		const favoritosLocalStorage =
+			JSON.parse(localStorage.getItem("favoritos")) ?? [];
 
-    function existeFavorito() {
-        const favoritosLocalStorage = JSON.parse(localStorage.getItem('favoritos')) ?? []
+		return favoritosLocalStorage.some(
+			(favorito) => favorito.idDrink === bebidas.receta.idDrink
+		);
+	}
 
-        return favoritosLocalStorage.some(favorito => favorito.idDrink === bebidas.receta.idDrink)
-    }
+	function eliminarFavorito() {
+		favoritos.value = favoritos.value.filter(
+			(favorito) => favorito.idDrink !== bebidas.receta.idDrink
+		);
 
-    function eliminarFavorito() {
-        favoritos.value = favoritos.value.filter(favorito => favorito.idDrink !== bebidas.receta.idDrink)
-    }
+		notificaciones.mostrar = true;
+		notificaciones.texto = "Eliminado de Favoritos";
+	}
 
-    function agregarFavorito(){
-        favoritos.value.push(bebidas.receta)
-    }
+	function agregarFavorito() {
+		favoritos.value.push(bebidas.receta);
+		notificaciones.mostrar = true;
+		notificaciones.texto = "Se agregó a favoritos";
+	}
 
-    const handleClickFavorito = () => {
-        if (existeFavorito()) {
-            eliminarFavorito()
-        } else {
-            agregarFavorito()
-        }
-    }
+	const handleClickFavorito = () => {
+		if (existeFavorito()) {
+			eliminarFavorito();
+		} else {
+			agregarFavorito();
+		}
 
-    return {
-        favoritos,
-        handleClickFavorito,
-        existeFavorito,
-    }
-})
+		modal.modal = false;
+	};
+
+	const noFavoritos = computed(() => {
+		return favoritos.value.length === 0;
+	});
+
+	return {
+		favoritos,
+		handleClickFavorito,
+		existeFavorito,
+		noFavoritos,
+	};
+});
